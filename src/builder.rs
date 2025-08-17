@@ -11,6 +11,26 @@ pub struct Script {
     inner: ScriptPublicKey,
 }
 
+impl serde::Serialize for Script {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let bytes = self.inner.script().to_vec();
+        serializer.serialize_bytes(&bytes)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Script {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let bytes: Vec<u8> = Vec::deserialize(deserializer)?;
+        Ok(Script::from_bytes(bytes))
+    }
+}
+
 impl Script {
     pub fn new() -> Self {
         Self {
@@ -151,7 +171,7 @@ pub enum Instruction<'a> {
     PushBytes(&'a [u8]),
 }
 
-#[derive(Clone, Debug, Hash, PartialEq)]
+#[derive(Clone, Debug, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Block {
     Call(u64),
     Script(Script),
@@ -164,11 +184,12 @@ impl Block {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StructuredScript {
     size: usize,
     pub debug_identifier: String,
     pub blocks: Vec<Block>, //List?
+    #[serde(skip)]
     script_map: HashMap<u64, StructuredScript>,
 }
 

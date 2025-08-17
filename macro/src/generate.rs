@@ -3,7 +3,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 
 pub fn generate(syntax: Vec<(Syntax, Span)>) -> TokenStream {
-    let mut tokens = quote!(::tondi_script::Script::new(
+    let mut tokens = quote!(::tondi_script::builder::StructuredScript::new(
         ::tondi_script::function_name!()
     ));
 

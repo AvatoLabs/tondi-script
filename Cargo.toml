@@ -19,6 +19,8 @@ tondi-wallet-keys = { version = "0.17.0", path = "../Tondi/wallet/keys" }
 script-macro = { path = "./macro" }
 # Standard library extensions for additional functionality
 stdext = "0.3.3"
+# Serialization support
+serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 # Binary serialization for testing and development

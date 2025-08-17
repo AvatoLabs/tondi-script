@@ -376,7 +376,7 @@ where
 {
     // Use a Vec here to get rid of warnings when the variable is overwritten
     let mut escape = quote! {
-        let mut script_var = bitcoin_script::Script::new("if");
+        let mut script_var = ::tondi_script::builder::StructuredScript::new("if");
     };
     escape.extend(std::iter::once(token.clone()));
     while let Some(if_token) = tokens.next() {
@@ -414,7 +414,7 @@ where
     T: Iterator<Item = TokenTree>,
 {
     let mut escape = quote! {
-        let mut script_var = bitcoin_script::Script::new("for");
+        let mut script_var = ::tondi_script::builder::StructuredScript::new("for");
     };
     escape.extend(std::iter::once(token.clone()));
     for for_token in tokens.by_ref() {
@@ -423,7 +423,7 @@ where
                 let inner_block = block.stream();
                 escape.extend(quote! {
                     {
-                        script_var = script_var.push_env_script(script !{
+                        script_var = script_var.push_env_script(script! {
                             #inner_block
                         });
                     }

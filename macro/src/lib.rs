@@ -10,6 +10,6 @@ use quote::quote;
 #[proc_macro]
 #[proc_macro_error]
 pub fn script(tokens: TokenStream) -> TokenStream {
-    set_dummy(quote!((::tondi_consensus_core::tx::Script::new())));
+    set_dummy(quote!((::tondi_script::builder::StructuredScript::new("script"))));
     generate(parse(tokens.into())).into()
 }
