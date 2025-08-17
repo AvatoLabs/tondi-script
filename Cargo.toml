@@ -9,6 +9,7 @@ edition = "2021"
 [dependencies]
 tondi-consensus-core = { version = "0.17.0", path = "../Tondi/consensus/core" }
 tondi-txscript = { version = "0.17.0", path = "../Tondi/crypto/txscript" }
+tondi-wallet-keys = { version = "0.17.0", path = "../Tondi/wallet/keys" }
 script-macro = { path = "./macro" }
 stdext = "0.3.3"
 

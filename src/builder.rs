@@ -1,9 +1,10 @@
 use tondi_consensus_core::tx::ScriptPublicKey;
-use tondi_txscript::opcodes::{Opcode, codes::*};
+use tondi_txscript::opcodes::codes::*;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::hash::{DefaultHasher, Hash, Hasher};
-
+use tondi_wallet_keys::publickey::PublicKey;
+use tondi_wallet_keys::publickey::XOnlyPublicKey;
 // 创建一个适配的Script类型，包装Tondi的ScriptPublicKey
 #[derive(Clone, Debug, Hash, PartialEq)]
 pub struct Script {
@@ -35,9 +36,9 @@ impl Script {
         self.inner.script().to_vec()
     }
 
-    pub fn push_opcode(&mut self, opcode: Opcode) {
+    pub fn push_opcode(&mut self, opcode: u8) {
         let mut script = self.inner.script().to_vec();
-        script.push(opcode.to_u8());
+        script.push(opcode);
         self.inner = ScriptPublicKey::from_vec(0, script);
     }
 
@@ -60,7 +61,7 @@ impl Script {
         self.inner = ScriptPublicKey::from_vec(0, script);
     }
 
-    pub fn instructions(&self) -> std::vec::IntoIter<Result<Instruction, ()>> {
+    pub fn instructions(&self) -> std::vec::IntoIter<Result<Instruction<'_>, ()>> {
         // 简化的指令解析器
         let mut instructions = Vec::new();
         let mut i = 0;
@@ -71,7 +72,7 @@ impl Script {
             i += 1;
             
             if opcode == 0x00 {
-                instructions.push(Ok(Instruction::Op(Opcode::from(0x00))));
+                instructions.push(Ok(Instruction::Op(opcode)));
             } else if opcode <= 0x4b {
                 // 数据推送
                 let len = opcode as usize;
@@ -131,7 +132,7 @@ impl Script {
                     break;
                 }
             } else {
-                instructions.push(Ok(Instruction::Op(Opcode::from(opcode))));
+                instructions.push(Ok(Instruction::Op(opcode)));
             }
         }
         
@@ -146,7 +147,7 @@ impl Script {
 
 #[derive(Debug, Clone)]
 pub enum Instruction<'a> {
-    Op(Opcode),
+    Op(u8),
     PushBytes(&'a [u8]),
 }
 
@@ -211,7 +212,7 @@ impl StructuredScript {
             .unwrap_or_else(|| panic!("script id: {} not found in script_map.", id))
     }
 
-    // Return the debug information of the Opcode at position
+    // Return the debug information of the OpCode at position
     pub fn debug_info(&self, position: usize) -> String {
         let mut current_pos = 0;
         for block in &self.blocks {
@@ -255,7 +256,7 @@ impl StructuredScript {
         }
     }
 
-    pub fn push_opcode(mut self, data: Opcode) -> StructuredScript {
+    pub fn push_opcode(mut self, data: u8) -> StructuredScript {
         self.size += 1;
         let script = self.get_script_block();
         script.push_opcode(data);
@@ -400,7 +401,7 @@ impl StructuredScript {
 
     pub fn compile(self) -> Script {
         let script = self.compile_to_bytes();
-        // Ensure that the builder has minimal opcodes:
+        // Ensure that the builder has minimal OpCodes:
         let script_buf = Script::from_bytes(script);
         let mut instructions_iter = script_buf.instructions();
         for result in script_buf.instructions_minimal() {
@@ -421,12 +422,12 @@ impl StructuredScript {
     pub fn push_int(self, data: i64) -> StructuredScript {
         // We can special-case -1, 1-16
         if data == -1 || (1..=16).contains(&data) {
-            let opcode = Opcode::from((data - 1 + OP_TRUE.to_u8() as i64) as u8);
+            let opcode = (data - 1 + OpTrue as i64) as u8;
             self.push_opcode(opcode)
         }
         // We can also special-case zero
         else if data == 0 {
-            self.push_opcode(OP_0)
+            self.push_opcode(OpFalse)
         }
         // Otherwise encode it as data
         else {
@@ -447,16 +448,16 @@ impl StructuredScript {
         self
     }
 
-    pub fn push_key(self, key: &::tondi_consensus_core::tx::PublicKey) -> StructuredScript {
-        if key.compressed {
-            self.push_slice(key.inner.serialize())
+    pub fn push_key(self, key: &PublicKey) -> StructuredScript {
+        if key.public_key.is_some() {
+            self.push_slice(key.public_key.as_ref().unwrap().serialize())
         } else {
-            self.push_slice(key.inner.serialize_uncompressed())
+            self.push_slice(key.xonly_public_key.serialize())
         }
     }
 
-    pub fn push_x_only_key(self, x_only_key: &::tondi_consensus_core::tx::XOnlyPublicKey) -> StructuredScript {
-        self.push_slice(x_only_key.serialize())
+    pub fn push_x_only_key(self, x_only_key: &XOnlyPublicKey) -> StructuredScript {
+        self.push_slice(x_only_key.inner.serialize())
     }
 
     pub fn push_expression<T: Pushable>(self, expression: T) -> StructuredScript {
@@ -521,7 +522,7 @@ impl NotU8Pushable for usize {
 }
 impl NotU8Pushable for Vec<u8> {
     fn tondi_script_push(self, builder: StructuredScript) -> StructuredScript {
-        // Push the element with a minimal opcode if it is a single number.
+        // Push the element with a minimal OpCode if it is a single number.
         if self.len() == 1 {
             builder.push_int(self[0].into())
         } else {
@@ -529,12 +530,12 @@ impl NotU8Pushable for Vec<u8> {
         }
     }
 }
-impl NotU8Pushable for ::tondi_consensus_core::tx::PublicKey {
+impl NotU8Pushable for PublicKey {
     fn tondi_script_push(self, builder: StructuredScript) -> StructuredScript {
         builder.push_key(&self)
     }
 }
-impl NotU8Pushable for ::tondi_consensus_core::tx::XOnlyPublicKey {
+impl NotU8Pushable for XOnlyPublicKey {
     fn tondi_script_push(self, builder: StructuredScript) -> StructuredScript {
         builder.push_x_only_key(&self)
     }

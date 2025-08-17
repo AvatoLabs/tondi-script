@@ -1,6 +1,5 @@
 use super::parse::Syntax;
-use tondi_txscript::opcodes::Opcode;
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 
 pub fn generate(syntax: Vec<(Syntax, Span)>) -> TokenStream {
@@ -10,7 +9,7 @@ pub fn generate(syntax: Vec<(Syntax, Span)>) -> TokenStream {
 
     for (item, span) in syntax {
         let push = match item {
-            ::Opcode(opcode) => generate_opcode(opcode, span),
+            Syntax::Opcode(opcode) => generate_opcode(opcode, span),
             Syntax::Bytes(bytes) => generate_bytes(bytes, span),
             Syntax::Int(int) => generate_int(int, span),
             Syntax::Escape(expression) => generate_escape(expression, span),
@@ -21,10 +20,9 @@ pub fn generate(syntax: Vec<(Syntax, Span)>) -> TokenStream {
     tokens
 }
 
-fn generate_opcode(opcode: Opcode, span: Span) -> TokenStream {
-    let ident = Ident::new(opcode.to_string().as_ref(), span);
+fn generate_opcode(opcode: u8, span: Span) -> TokenStream {
     quote_spanned!(span=>
-            .push_opcode(::tondi_txscript::opcodes::codes::#ident)
+            .push_opcode(#opcode)
     )
 }
 
