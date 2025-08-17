@@ -189,7 +189,6 @@ pub struct StructuredScript {
     size: usize,
     pub debug_identifier: String,
     pub blocks: Vec<Block>, //List?
-    #[serde(skip)]
     script_map: HashMap<u64, StructuredScript>,
 }
 

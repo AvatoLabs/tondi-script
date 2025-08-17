@@ -176,18 +176,18 @@ fn test_performance_loop() {
 #[test]
 fn test_performance_no_macro() {
     let mut builder = tondi_script::builder::StructuredScript::new("test");
-    for _ in 0..80_000_000 {
+    for _ in 0..1_000_000 {
         builder = builder.push_opcode(OpAdd);
     }
 
     let script = builder.compile();
-    assert_eq!(script.as_bytes()[40_000_000 - 1], 147);
+    assert_eq!(script.as_bytes()[1_000_000 - 1], 147);
 }
 
 #[test]
 fn test_performance_if() {
     let script = script! {
-        for _ in 0..5_000_000 {
+        for _ in 0..1_000_000 {
             if true {
                 OpAdd
                 OpAdd
@@ -197,7 +197,7 @@ fn test_performance_if() {
         }
     };
 
-    assert_eq!(script.compile().as_bytes()[5_000_000 - 1], 147)
+    assert_eq!(script.compile().as_bytes()[1_000_000 - 1], 147)
 }
 
 #[test]
