@@ -1,12 +1,157 @@
-use tondi_consensus_core::tx::{Script, ScriptPublicKey};
+use tondi_consensus_core::tx::ScriptPublicKey;
 use tondi_txscript::opcodes::{Opcode, codes::*};
-use tondi_consensus_core::hashing::scriptint::write_scriptint;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+
+// 创建一个适配的Script类型，包装Tondi的ScriptPublicKey
+#[derive(Clone, Debug, Hash, PartialEq)]
+pub struct Script {
+    inner: ScriptPublicKey,
+}
+
+impl Script {
+    pub fn new() -> Self {
+        Self {
+            inner: ScriptPublicKey::new(0, vec![].into())
+        }
+    }
+
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+        Self {
+            inner: ScriptPublicKey::from_vec(0, bytes)
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.script().len()
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.inner.script()
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.inner.script().to_vec()
+    }
+
+    pub fn push_opcode(&mut self, opcode: Opcode) {
+        let mut script = self.inner.script().to_vec();
+        script.push(opcode.to_u8());
+        self.inner = ScriptPublicKey::from_vec(0, script);
+    }
+
+    pub fn push_slice<T: AsRef<[u8]>>(&mut self, data: T) {
+        let mut script = self.inner.script().to_vec();
+        let data = data.as_ref();
+        if data.len() <= 75 {
+            script.push(data.len() as u8);
+        } else if data.len() <= 0xff {
+            script.push(0x4c);
+            script.push(data.len() as u8);
+        } else if data.len() <= 0xffff {
+            script.push(0x4d);
+            script.extend_from_slice(&(data.len() as u16).to_le_bytes());
+        } else {
+            script.push(0x4e);
+            script.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        }
+        script.extend_from_slice(data);
+        self.inner = ScriptPublicKey::from_vec(0, script);
+    }
+
+    pub fn instructions(&self) -> std::vec::IntoIter<Result<Instruction, ()>> {
+        // 简化的指令解析器
+        let mut instructions = Vec::new();
+        let mut i = 0;
+        let bytes = self.inner.script();
+        
+        while i < bytes.len() {
+            let opcode = bytes[i];
+            i += 1;
+            
+            if opcode == 0x00 {
+                instructions.push(Ok(Instruction::Op(Opcode::from(0x00))));
+            } else if opcode <= 0x4b {
+                // 数据推送
+                let len = opcode as usize;
+                if i + len <= bytes.len() {
+                    instructions.push(Ok(Instruction::PushBytes(&bytes[i..i+len])));
+                    i += len;
+                } else {
+                    instructions.push(Err(()));
+                    break;
+                }
+            } else if opcode == 0x4c {
+                // OP_PUSHDATA1
+                if i < bytes.len() {
+                    let len = bytes[i] as usize;
+                    i += 1;
+                    if i + len <= bytes.len() {
+                        instructions.push(Ok(Instruction::PushBytes(&bytes[i..i+len])));
+                        i += len;
+                    } else {
+                        instructions.push(Err(()));
+                        break;
+                    }
+                } else {
+                    instructions.push(Err(()));
+                    break;
+                }
+            } else if opcode == 0x4d {
+                // OP_PUSHDATA2
+                if i + 1 < bytes.len() {
+                    let len = u16::from_le_bytes([bytes[i], bytes[i+1]]) as usize;
+                    i += 2;
+                    if i + len <= bytes.len() {
+                        instructions.push(Ok(Instruction::PushBytes(&bytes[i..i+len])));
+                        i += len;
+                    } else {
+                        instructions.push(Err(()));
+                        break;
+                    }
+                } else {
+                    instructions.push(Err(()));
+                    break;
+                }
+            } else if opcode == 0x4e {
+                // OP_PUSHDATA4
+                if i + 3 < bytes.len() {
+                    let len = u32::from_le_bytes([bytes[i], bytes[i+1], bytes[i+2], bytes[i+3]]) as usize;
+                    i += 4;
+                    if i + len <= bytes.len() {
+                        instructions.push(Ok(Instruction::PushBytes(&bytes[i..i+len])));
+                        i += len;
+                    } else {
+                        instructions.push(Err(()));
+                        break;
+                    }
+                } else {
+                    instructions.push(Err(()));
+                    break;
+                }
+            } else {
+                instructions.push(Ok(Instruction::Op(Opcode::from(opcode))));
+            }
+        }
+        
+        instructions.into_iter()
+    }
+
+    pub fn instructions_minimal(&self) -> std::vec::IntoIter<Result<(), ()>> {
+        // 简化的最小化检查
+        self.instructions().map(|r| r.map(|_| ())).collect::<Vec<_>>().into_iter()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Instruction<'a> {
+    Op(Opcode),
+    PushBytes(&'a [u8]),
+}
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, PartialEq)]
@@ -322,6 +467,35 @@ impl StructuredScript {
     pub fn push_expression<T: Pushable>(self, expression: T) -> StructuredScript {
         expression.tondi_script_push(self)
     }
+}
+
+// 简化的scriptint写入函数
+fn write_scriptint(result: &mut [u8; 8], value: i64) -> usize {
+    if value == 0 {
+        return 0;
+    }
+    
+    let mut abs_value = if value < 0 { -value } else { value } as u64;
+    let mut size = 0;
+    
+    while abs_value > 0 {
+        result[size] = (abs_value & 0xff) as u8;
+        abs_value >>= 8;
+        size += 1;
+    }
+    
+    // 如果最高位是1，需要添加一个0字节
+    if (result[size - 1] & 0x80) != 0 {
+        result[size] = 0;
+        size += 1;
+    }
+    
+    // 如果是负数，设置最高位
+    if value < 0 {
+        result[size - 1] |= 0x80;
+    }
+    
+    size
 }
 
 // We split up the tondi_script_push function to allow pushing a single u8 value as
