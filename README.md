@@ -1,103 +1,178 @@
-# NexusVM Tondi Script
+# Tondi Script Library
+
+A high-level scripting interface library for the Tondi blockchain, providing a procedural macro for compile-time script generation and a builder pattern for runtime script construction.
+
+## Features
+
+- **Procedural Macro**: `script!` macro for compile-time script generation
+- **Builder Pattern**: Fluent API for building scripts at runtime
+- **Type Safety**: Compile-time validation of script structure
+- **Performance**: Efficient script compilation and execution
+- **Complete Support**: Support for all Tondi opcodes and script operations
+
+## Installation
+
+Add the dependency to your `Cargo.toml`:
+
+```toml
+[dependencies]
+tondi-script = { path = "path/to/tondi-script" }
+```
 
 ## Usage
 
-This crate exports a `script!` macro which can be used to build structured Tondi scripts and compiled to the [`Script`](https://docs.rs/bitcoin/latest/bitcoin/struct.ScriptBuf.html) type from the [`bitcoin`](https://github.com/rust-bitcoin/rust-bitcoin) crate.
-
-**Example:**
+### Basic Script Creation
 
 ```rust
-use bitcoin_script::bitcoin_script;
+use tondi_script::{script, Script};
 
-let htlc_script = script! {
-    OP_IF
-        OP_SHA256 <digest> OP_EQUALVERIFY OP_DUP OP_SHA256 <seller_pubkey_hash>
-    OP_ELSE
-        100 OP_CSV OP_DROP OP_DUP OP_HASH160 <buyer_pubkey_hash>
-    OP_ENDIF
-    OP_EQUALVERIFY
-    OP_CHECKSIG
+// Create a simple script
+let script = script! {
+    OpDup
+    OpSHA256
+    0x20
+    0x89abcdef89abcdef89abcdef89abcdef89abcdef89abcdef89abcdef89abcdef
+    OpEqualVerify
+    OpCheckSig
 };
 
-let script_buf = htlc_script.compile();
+let compiled_script = script.compile();
 ```
 
-### Syntax
-
-Scripts are based on the standard syntax made up of opcodes, base-10 integers, or hex string literals. Additionally, Rust expressions can be interpolated in order to support dynamically capturing Rust variables or computing values (delimited by `<angle brackets>` or `{curly brackets}`). The `script!` macro can be nested.
-
-Whitespace is ignored - scripts can be formatted in the author's preferred style.
-
-#### Opcodes
-
-All normal opcodes are available, in the form `OP_X`.
+### Conditional Script Generation
 
 ```rust
-let script = script!(OP_CHECKSIG OP_VERIFY);
-```
-
-#### Integer Literals
-
-Positive and negative 64-bit integer literals can be used, and will resolve to their most efficient encoding.
-
-For example:
-- `2` will resolve to `OP_PUSHNUM_2` (`0x52`)
-- `255` will resolve to a length-delimited varint: `0x02ff00` (note the extra zero byte, due to the way Bitcoin scripts use the most-significant bit to represent the sign)`
-
-```rust
-let script = script!(123 -456 999999);
-```
-
-#### Hex Literals
-
-Hex strings can be specified, prefixed with `0x`.
-
-```rust
-let script = script!(
-    0x0102030405060708090a0b0c0d0e0f OP_HASH160
-);
-```
-
-#### Escape Sequences
-
-Dynamic Rust expressions are supported inside the script, surrounded by angle brackets or in a code block. In many cases, this will just be a variable identifier, but this can also be a function call or arithmetic.
-
-Rust expressions of the following types are supported:
-
-- `i64`
-- `Vec<u8>`
-- [`bitcoin::PublicKey`](https://docs.rs/bitcoin/latest/bitcoin/struct.PublicKey.html)
-- [`bitcoin::XOnlyPublicKey`](https://docs.rs/bitcoin/latest/bitcoin/struct.XOnlyPublicKey.html)
-- [`bitcoin::ScriptBuf`](https://docs.rs/bitcoin/latest/bitcoin/struct.ScriptBuf.html)
-- `StructuredScript`
-
-```rust
-let bytes = vec![1, 2, 3];
-
+let condition = true;
 let script = script! {
-    <bytes> OP_CHECKSIGVERIFY
-
-    <2016 * 5> OP_CSV
-
-    <script! { OP_FALSE OP_TRUE }>
-};
-```
-
-#### Conditional Scipt Generation
-
-For-loops and if-else-statements are supported inside the script and will be unrolled when the scripts are generated.
-
-```rust
-let loop_count = 10;
-
-let script = script! {
-    for i in 0..loop_count {
-        if i % 2 == 0 {
-            OP_ADD
-        } else {
-            OP_DUP
-            OP_ADD
-        }
+    if condition {
+        OpTrue
+        OpCheckSig
+    } else {
+        OpFalse
+        OpReturn
     }
 };
+```
 
+### Loop Script Generation
+
+```rust
+let count = 3;
+let script = script! {
+    for _ in 0..count {
+        OpAdd
+    }
+};
+```
+
+### Dynamic Data Insertion
+
+```rust
+let pubkey_hash = vec![0x12, 0x34, 0x56, 0x78];
+let script = script! {
+    OpDup
+    OpBlake3
+    { pubkey_hash }
+    OpEqualVerify
+    OpCheckSig
+};
+```
+
+## Syntax
+
+### Opcodes
+
+All Tondi opcodes are available in the following formats:
+- `OpCheckSig` - Standard format
+- `CheckSig` - No prefix format (automatically recognized)
+- `TRUE` / `FALSE` - Boolean aliases
+
+### Integer Literals
+
+Supports positive and negative 64-bit integers with automatic optimal encoding:
+- `2` → `Op2` (0x52)
+- `0` → `OpFalse` (0x00)
+- `-1` → `Op1Negate` (0x4f)
+
+### Hexadecimal Literals
+
+Hexadecimal strings prefixed with `0x`:
+```rust
+let script = script! {
+    0x0102030405060708090a0b0c0d0e0f
+    OpSHA256
+};
+```
+
+### Escape Sequences
+
+Supports Rust expression insertion enclosed in angle brackets:
+```rust
+let bytes = vec![1, 2, 3, 4];
+let script = script! {
+    <bytes>
+    OpCheckSigVerify
+    <2016 * 5>
+    OpCheckLockTimeVerify
+};
+```
+
+## Supported Data Types
+
+- `i64`, `i32`, `u32`, `usize`
+- `Vec<u8>`
+- `tondi_wallet_keys::PublicKey`
+- `tondi_wallet_keys::XOnlyPublicKey`
+- `Script` / `StructuredScript`
+
+## Performance Features
+
+- **Compile-time Optimization**: Scripts are generated at compile time with zero runtime overhead
+- **Memory Efficiency**: Smart memory management and script caching
+- **Structured Scripts**: Support for script reuse and nesting
+
+## Relationship with Tondi Core
+
+This library is an enhanced wrapper around Tondi's core script functionality, providing:
+- More developer-friendly API interfaces
+- Compile-time script validation
+- Advanced script building capabilities
+- Type-safe script operations
+
+## Project Structure
+
+```
+tondi-script/
+├── Cargo.toml          # Workspace configuration
+├── macro/              # Procedural macro crate
+│   ├── Cargo.toml      # Macro dependencies
+│   └── src/
+│       ├── lib.rs      # Macro entry point
+│       ├── parse.rs    # Script parsing logic
+│       └── generate.rs # Code generation
+├── src/
+│   ├── lib.rs          # Main library exports
+│   └── builder.rs      # Script builder implementation
+└── tests/
+    └── test.rs         # Test suite
+```
+
+## Examples
+
+See the `tests/test.rs` file for comprehensive usage examples including:
+- Basic script operations
+- Conditional and loop constructs
+- Performance benchmarks
+- Complex script compositions
+
+## License
+
+MIT License
+
+## Contributing
+
+Issues and Pull Requests are welcome to improve this project.
+
+## Chinese Documentation
+
+For Chinese documentation, see [README.cn](README.cn).

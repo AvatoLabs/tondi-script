@@ -1,17 +1,25 @@
+# Workspace configuration for the tondi-script project
+# This project provides a high-level scripting interface for the Tondi chain
 [workspace]
-members = ["macro"]
+members = ["macro"]  # Include the procedural macro crate as a workspace member
 
 [package]
-name = "tondi-script"
-version = "0.1.0"
-edition = "2021"
+name = "tondi-script"  # Main crate name for the Tondi scripting library
+version = "0.1.0"      # Current version of the library
+edition = "2021"       # Rust edition used
 
 [dependencies]
+# Core consensus types and structures from the Tondi blockchain
 tondi-consensus-core = { version = "0.17.0", path = "../Tondi/consensus/core" }
+# Transaction script opcodes and utilities for Tondi
 tondi-txscript = { version = "0.17.0", path = "../Tondi/crypto/txscript" }
+# Wallet key management and cryptographic operations
 tondi-wallet-keys = { version = "0.17.0", path = "../Tondi/wallet/keys" }
+# Procedural macro for compile-time script generation
 script-macro = { path = "./macro" }
+# Standard library extensions for additional functionality
 stdext = "0.3.3"
 
 [dev-dependencies]
+# Binary serialization for testing and development
 bincode = "1.3.3"
