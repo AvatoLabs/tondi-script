@@ -175,4 +175,4 @@ Issues and Pull Requests are welcome to improve this project.
 
 ## Chinese Documentation
 
-For Chinese documentation, see [(README_CN.md](README_CN.md).
+For Chinese documentation, see [README_CN.md](README_CN.md).
