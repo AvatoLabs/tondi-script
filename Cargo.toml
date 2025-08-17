@@ -5,7 +5,7 @@ members = ["macro"]  # Include the procedural macro crate as a workspace member
 
 [package]
 name = "tondi-script"  # Main crate name for the Tondi scripting library
-version = "0.1.0"      # Current version of the library
+version = "0.17.0"      # Current version of the library
 edition = "2021"       # Rust edition used
 
 [dependencies]
