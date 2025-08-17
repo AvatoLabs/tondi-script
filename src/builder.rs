@@ -4,9 +4,6 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 // 创建一个适配的Script类型，包装Tondi的ScriptPublicKey
 #[derive(Clone, Debug, Hash, PartialEq)]
 pub struct Script {
@@ -153,7 +150,6 @@ pub enum Instruction<'a> {
     PushBytes(&'a [u8]),
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Hash, PartialEq)]
 pub enum Block {
     Call(u64),
@@ -167,7 +163,6 @@ impl Block {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct StructuredScript {
     size: usize,

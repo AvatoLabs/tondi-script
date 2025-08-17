@@ -1,6 +1,5 @@
 use tondi_consensus_core::{
     consensus::{encode, Encodable},
-    tx::Witness,
 };
 use tondi_txscript::opcodes::codes::OP_ADD;
 use tondi_script::{script, Script};
@@ -260,7 +259,7 @@ fn test_non_optimal_opcodes() {
 #[test]
 fn test_push_witness() {
     for i in 0..512 {
-        let mut witness = Witness::new();
+        let mut witness = tondi_consensus_core::tx::Witness::new();
         let vec = vec![129u8; i];
         witness.push(vec.clone());
         let script = script! {
@@ -276,7 +275,7 @@ fn test_push_witness() {
         );
     }
 
-    let mut witness = Witness::new();
+    let mut witness = tondi_consensus_core::tx::Witness::new();
     for i in 0..16 {
         let mut varint = Vec::new();
         encode::VarInt(i).consensus_encode(&mut varint).unwrap();
